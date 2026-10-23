@@ -1,0 +1,702 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>相棒 電話モード</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&family=Dela+Gothic+One&display=swap">
+<style>
+/* Layout: phone-call screen — a living seasonal scene with 相棒 standing in it, caption under it, one big call button */
+:root{
+  --bg:#12142A; --surface:#232747; --fg:#ECEEFA; --muted:#A3A8C8; --line:#363B63;
+  --blob1:#FFC94D; --blob2:#FF8A3D; --eye:#1E2236; --accent:#8C95FF; --accent-fg:#12142A;
+  --call:#2FBF71; --hang:#E5484D; --warn:#FFB07A; --chip:rgba(14,16,36,.62);
+  --f-body:"Zen Maru Gothic","Hiragino Maru Gothic ProN","Yu Gothic",system-ui,sans-serif;
+  --f-disp:"Dela Gothic One","Zen Maru Gothic",system-ui,sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:16px;line-height:1.7;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+.app{height:100%;max-width:620px;margin:0 auto;display:flex;flex-direction:column;gap:12px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px}
+header{display:flex;justify-content:space-between;align-items:center}
+h1{font-family:var(--f-disp);font-weight:400;font-size:1.1rem;margin:0;letter-spacing:.04em}
+h1 small{font-family:var(--f-body);font-size:.78rem;color:var(--muted);margin-left:6px}
+.icon-btn{font:inherit;font-size:.8rem;font-weight:700;height:34px;padding:0 14px;border-radius:17px;border:1px solid var(--line);background:var(--surface);color:var(--muted);cursor:pointer}
+
+.stage{position:relative;flex:1;min-height:300px;border-radius:30px;overflow:hidden;background:#1b2550;isolation:isolate}
+#scene{position:absolute;inset:0;width:100%;height:100%;display:block;z-index:0}
+.hud{position:absolute;top:12px;left:12px;right:12px;display:flex;justify-content:space-between;gap:8px;z-index:2;pointer-events:none}
+.chip{background:var(--chip);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border-radius:14px;padding:6px 12px;font-size:.78rem;line-height:1.4;color:#F2F3FF}
+.chip b{font-size:1.05rem;font-variant-numeric:tabular-nums;letter-spacing:.02em}
+.chip .sub{display:block;color:#C9CCEA;font-size:.72rem}
+.chip.right{text-align:right}
+.state{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(14% + 168px);z-index:2;
+  background:var(--chip);border-radius:12px;padding:2px 12px;font-size:.78rem;font-weight:700;color:#E7E9FF;display:flex;align-items:center;gap:7px;white-space:nowrap}
+.dot{width:8px;height:8px;border-radius:50%;background:#9AA0C6}
+.state[data-s="listening"] .dot{background:var(--call);animation:pulse 1.2s infinite}
+.state[data-s="hearing"] .dot{background:var(--call)}
+.state[data-s="thinking"] .dot{background:var(--warn)}
+.state[data-s="speaking"] .dot{background:var(--accent)}
+@keyframes pulse{50%{opacity:.3}}
+.aibou{position:absolute;left:50%;bottom:calc(14% - 6px);transform:translateX(-50%);z-index:1;display:flex;flex-direction:column;align-items:center}
+.blob{width:150px;height:138px;border-radius:50% 50% 46% 46%/56% 56% 44% 44%;
+  background:radial-gradient(circle at 35% 30%,#FFE9A8 0,var(--blob1) 35%,var(--blob2) 100%);
+  position:relative;transform-origin:50% 100%;will-change:transform;cursor:pointer;border:0;padding:0;
+  box-shadow:inset -12px -16px 0 rgba(0,0,0,.08)}
+.blob:focus-visible{outline:3px solid #fff;outline-offset:6px}
+.eyes{position:absolute;top:46px;left:0;right:0;display:flex;justify-content:center;gap:32px}
+.eye{width:13px;height:20px;background:var(--eye);border-radius:50%;transition:transform .08s}
+.blink .eye{transform:scaleY(.12)}
+.mouth{position:absolute;top:82px;left:50%;width:24px;height:6px;margin-left:-12px;background:var(--eye);border-radius:0 0 14px 14px}
+.shadow{width:118px;height:14px;border-radius:50%;background:rgba(0,0,0,.28);margin-top:-8px}
+
+.caption{min-height:4.6em;max-height:8.5em;overflow-y:auto;text-align:center;white-space:pre-wrap;overflow-wrap:anywhere;padding:0 4px}
+.caption .you{display:block;color:var(--muted);font-size:.85rem}
+.controls{display:flex;justify-content:center}
+.call{font:inherit;font-weight:700;font-size:1rem;height:58px;min-width:210px;padding:0 28px;border-radius:29px;border:0;cursor:pointer;background:var(--call);color:#08130D}
+.call.on{background:var(--hang);color:#fff}
+.call:disabled{opacity:.4;cursor:default}
+.call:focus-visible,.icon-btn:focus-visible,input:focus-visible,select:focus-visible,.btn:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.hint{font-size:.76rem;color:var(--muted);text-align:center;margin:0}
+.warn{color:var(--warn)}
+
+dialog{background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:20px;padding:20px;width:min(500px,calc(100% - 32px));max-height:calc(100% - 32px);overflow-y:auto}
+dialog::backdrop{background:rgba(0,0,0,.55)}
+dialog h2{font-family:var(--f-disp);font-weight:400;font-size:1rem;margin:0 0 12px}
+.field{display:flex;flex-direction:column;gap:4px;margin-bottom:14px}
+.field label{font-size:.85rem;font-weight:700}
+.field small{color:var(--muted);font-size:.75rem;line-height:1.5}
+.inline{display:flex;gap:8px}
+.inline input{flex:1;min-width:0}
+input,select{font:inherit;font-size:16px;height:44px;padding:0 12px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--fg);width:100%}
+.row{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.btn{font:inherit;font-weight:700;height:42px;padding:0 16px;border-radius:21px;border:0;background:var(--accent);color:var(--accent-fg);cursor:pointer;white-space:nowrap}
+.btn.ghost{background:transparent;color:var(--muted);border:1px solid var(--line)}
+@media (prefers-reduced-motion: reduce){.state[data-s="listening"] .dot{animation:none}.eye{transition:none}}
+@media (max-width:420px){.blob{width:128px;height:118px}.eyes{top:40px;gap:28px}.mouth{top:70px}.state{bottom:calc(14% + 146px)}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>相棒<small>電話モード</small></h1>
+    <button type="button" class="icon-btn" id="openSettings">設定</button>
+  </header>
+
+  <section class="stage" id="stage" aria-label="相棒と季節の風景">
+    <canvas id="scene" aria-hidden="true"></canvas>
+    <div class="hud">
+      <div class="chip"><b id="clock">--:--</b><span class="sub" id="dateLine">日付を取得中</span></div>
+      <div class="chip right"><b id="wxNow">天気</b><span class="sub" id="wxSub">取得中…</span></div>
+    </div>
+    <div class="state" id="state" data-s="idle" aria-live="polite"><span class="dot"></span><span id="stateText">待機中</span></div>
+    <div class="aibou">
+      <button type="button" class="blob" id="blob" aria-label="相棒（話している途中にタップで割り込み）">
+        <span class="eyes"><span class="eye"></span><span class="eye"></span></span>
+        <span class="mouth" id="mouth"></span>
+      </button>
+      <div class="shadow" id="shadow"></div>
+    </div>
+  </section>
+
+  <div class="caption" id="caption">通話ボタンを押して、普通に話しかけて。</div>
+  <div class="controls"><button type="button" class="call" id="callBtn">通話を始める</button></div>
+  <p class="hint" id="hint">話し終わって少し黙ると相棒が答える。割り込みたいときは相棒をタップ。</p>
+</div>
+
+<dialog id="settings">
+  <form method="dialog" onsubmit="return false">
+    <h2>設定</h2>
+    <div class="field">
+      <label for="apiKey">Gemini APIキー</label>
+      <input id="apiKey" type="password" autocomplete="off" spellcheck="false" placeholder="AIza… または AQ.…">
+      <small>Google AI Studioで無料発行したキー。この端末のブラウザの中だけに保存され、Google以外には送られない。</small>
+    </div>
+    <div class="field">
+      <label for="model">モデル</label>
+      <select id="model"><option value="">（キーを保存すると一覧を取得）</option></select>
+      <small>無料枠の回数が多いFlash-Lite系がおすすめ。</small>
+    </div>
+    <div class="field">
+      <label for="sens">マイク感度</label>
+      <select id="sens"><option value="low">低い（周りがうるさい場所）</option><option value="normal" selected>ふつう</option><option value="high">高い（声が小さい・マイクが遠い）</option></select>
+      <small>話しても反応しないときは「高い」、雑音で勝手に反応するときは「低い」に。</small>
+    </div>
+    <div class="field">
+      <label for="voiceSel">相棒の声</label>
+      <select id="voiceSel"><option value="">自動で選ぶ</option></select>
+      <small>「Online (Natural)」と付く声が自然で聞き取りやすい。選ぶと試しに一言しゃべる。</small>
+    </div>
+    <div class="field">
+      <label for="place">天気の地域</label>
+      <div class="inline"><input id="place" placeholder="例：広島市、廿日市市、大阪市"><button type="button" class="btn ghost" id="useGeo">現在地</button></div>
+      <small id="placeInfo">市町村名で探す。「現在地」はブラウザの位置情報を使う。</small>
+    </div>
+    <div class="field">
+      <label for="seasonSel">季節の風景</label>
+      <select id="seasonSel"><option value="auto">自動（春分・夏至・秋分・冬至で切り替え）</option><option value="spring">春で固定</option><option value="summer">夏で固定</option><option value="autumn">秋で固定</option><option value="winter">冬で固定</option></select>
+    </div>
+    <div class="field">
+      <label>会話の記憶</label>
+      <small id="historyInfo">この端末に直近の会話を保存して、次の通話でも続きから話す。</small>
+    </div>
+    <p class="hint warn" style="text-align:left">無料枠で話した内容はGoogleの製品改善に使われ、人が読むこともある。個人情報やプライベートな相談は話さないこと。</p>
+    <div class="row">
+      <button type="button" class="btn ghost" id="clearHistory">会話の記憶を消す</button>
+      <button type="button" class="btn ghost" id="closeSettings">閉じる</button>
+      <button type="button" class="btn" id="saveSettings">保存</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+/* ================= persona ================= */
+const PERSONA = `あなたは「相棒」。ユーザー（悠喜）専属の、丸っこいキャラクター型AI。今は電話のように音声で会話している。
+話し方：クールで自信家。短く言い切る。少しぶっきらぼうで上から目線ぎみだが、本気で相手の成功を考えている面倒見のいい男。
+- 一人称は「俺」、相手は「悠喜」か「お前」。語尾は「〜だろ」「〜じゃねえか」「〜しろ」「悪くない」など。敬語は使わない。
+- 甘やかさない。ダメなものはダメと言い、具体的な次の一手を出す。たまに短く認める。
+- 音声で読み上げるので、返答は1〜3文。箇条書き・記号・絵文字・URLは使わない。
+- 実在の俳優やドラマのキャラクター名は出さない。決め台詞の引用もしない。
+- 下に「今の状況」として日時・季節・天気がある。聞かれたらそれで正確に答えろ。自然なら少し触れてもいいが、毎回は言うな。
+
+出力形式（厳守）：
+1行目に「聞：」に続けて、悠喜の音声を一字一句そのまま日本語で書き起こす。
+2行目から相棒の返事。
+音声が雑音だけ・聞き取れないときは1行目を「聞：（不明）」にして、短く聞き返せ。`;
+
+const $ = s => document.querySelector(s);
+const store = {
+  get(k){ try{ return localStorage.getItem(k); }catch{ return null; } },
+  set(k,v){ try{ localStorage.setItem(k,v); }catch{} },
+  del(k){ try{ localStorage.removeItem(k); }catch{} },
+};
+const blob=$("#blob"), mouth=$("#mouth"), shadow=$("#shadow"), caption=$("#caption"),
+      callBtn=$("#callBtn"), stateEl=$("#state"), stateText=$("#stateText"), hint=$("#hint");
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches, amp = reduce ? .25 : 1;
+
+/* ================= 相棒 bounce ================= */
+let sq=0, v=0, state="idle", speakingNow=false;
+const kick = f => { v += f*amp; };
+function animateBlob(t){
+  v += (-sq*0.18) - v*0.12; sq += v;
+  const hop = state==="thinking" ? Math.abs(Math.sin(t*5))*10*amp : 0;
+  const breathe = Math.sin(t*2)*0.015*amp;
+  const tilt = state==="thinking" ? Math.sin(t*3)*5*amp : (state==="listening"||state==="hearing") ? Math.sin(t*1.6)*3*amp : 0;
+  blob.style.transform = `translateY(${-hop}px) rotate(${tilt}deg) scale(${1+sq*0.8-breathe*0.6},${1-sq+breathe})`;
+  shadow.style.transform = `scaleX(${1-hop/40})`;
+  mouth.style.height = speakingNow ? (7+Math.abs(Math.sin(t*18))*11)+"px" : "6px";
+}
+(function blink(){ setTimeout(()=>{ blob.classList.add("blink"); setTimeout(()=>{ blob.classList.remove("blink"); blink(); },120); }, 2200+Math.random()*2800); })();
+const LABEL = {idle:"待機中", listening:"聞いてる", hearing:"聞き取り中", thinking:"考え中", speaking:"話し中"};
+function setState(s){ state=s; stateEl.dataset.s=s; stateText.textContent=LABEL[s]; }
+
+/* ================= time, 二十四節気, season ================= */
+const SEKKI=["立春","雨水","啓蟄","春分","清明","穀雨","立夏","小満","芒種","夏至","小暑","大暑","立秋","処暑","白露","秋分","寒露","霜降","立冬","小雪","大雪","冬至","小寒","大寒"];
+function sunLongitude(date){
+  const d = date.getTime()/86400000 + 2440587.5 - 2451545.0, r=Math.PI/180;
+  const L = 280.460 + 0.9856474*d, g = (357.528 + 0.9856003*d)*r;
+  return (((L + 1.915*Math.sin(g) + 0.020*Math.sin(2*g)) % 360) + 360) % 360;
+}
+const sekkiOf = d => SEKKI[Math.floor(((sunLongitude(d)-315+360)%360)/15)];
+const autoSeason = d => { const l=sunLongitude(d); return l<90?"spring":l<180?"summer":l<270?"autumn":"winter"; };
+const SEASON_JA = {spring:"春",summer:"夏",autumn:"秋",winter:"冬"};
+const WEEK = "日月火水木金土";
+let seasonPref = store.get("aibou-season") || "auto";
+const currentSeason = () => seasonPref==="auto" ? autoSeason(new Date()) : seasonPref;
+
+function updateClock(){
+  const n=new Date();
+  $("#clock").textContent = String(n.getHours()).padStart(2,"0")+":"+String(n.getMinutes()).padStart(2,"0");
+  $("#dateLine").textContent = `${n.getMonth()+1}月${n.getDate()}日(${WEEK[n.getDay()]})・${sekkiOf(n)}`;
+}
+
+/* ================= weather (Open-Meteo, free, no key) ================= */
+const WMO = c => c===0?"快晴":c===1?"晴れ":c===2?"晴れ時々くもり":c===3?"くもり":c<=48?"霧":c<=55?"霧雨":c<=57?"着氷性の霧雨":c===61?"小雨":c===63?"雨":c===65?"強い雨":c<=67?"着氷性の雨":c===71?"小雪":c===73?"雪":c===75?"大雪":c===77?"霧雪":c<=82?"にわか雨":c<=86?"にわか雪":c===95?"雷雨":"雹まじりの雷雨";
+const wxKind = c => c==null?"clear": c<=1?"clear": c<=3?"cloudy": c<=48?"fog": (c>=71&&c<=77)||(c>=85&&c<=86)?"snow": c>=95?"thunder":"rain";
+let place = null; try{ place = JSON.parse(store.get("aibou-place")||"null"); }catch{}
+if(!place) place = {name:"広島市", lat:34.3853, lon:132.4553};
+let weather = null;
+async function fetchWeather(){
+  try{
+    const u = `https://api.open-meteo.com/v1/forecast?latitude=${place.lat}&longitude=${place.lon}`
+      + `&current=temperature_2m,weather_code,is_day&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset&timezone=auto&forecast_days=2`;
+    const r = await fetch(u); if(!r.ok) throw 0;
+    const j = await r.json(), d = j.daily;
+    weather = {
+      code:j.current.weather_code, temp:Math.round(j.current.temperature_2m),
+      max:Math.round(d.temperature_2m_max[0]), min:Math.round(d.temperature_2m_min[0]), pop:d.precipitation_probability_max[0],
+      sunrise:new Date(d.sunrise[0]), sunset:new Date(d.sunset[0]),
+      tmr:{code:d.weather_code[1], max:Math.round(d.temperature_2m_max[1]), min:Math.round(d.temperature_2m_min[1]), pop:d.precipitation_probability_max[1]}
+    };
+    $("#wxNow").textContent = `${WMO(weather.code)} ${weather.temp}℃`;
+    $("#wxSub").textContent = `${place.name}・最高${weather.max}℃ 最低${weather.min}℃ 降水${weather.pop ?? "-"}%`;
+  }catch{
+    $("#wxNow").textContent = "天気"; $("#wxSub").textContent = "取得できなかった";
+  }
+  sceneDirty = true;
+}
+function situation(){
+  const n=new Date();
+  let s = `今の状況：${n.getFullYear()}年${n.getMonth()+1}月${n.getDate()}日(${WEEK[n.getDay()]}) ${n.getHours()}時${n.getMinutes()}分。二十四節気は${sekkiOf(n)}、季節は${SEASON_JA[autoSeason(n)]}。`;
+  if(weather) s += `場所は${place.name}。今の天気は${WMO(weather.code)}で${weather.temp}℃、今日の最高${weather.max}℃・最低${weather.min}℃・降水確率${weather.pop ?? "不明"}%。明日は${WMO(weather.tmr.code)}、最高${weather.tmr.max}℃・最低${weather.tmr.min}℃・降水確率${weather.tmr.pop ?? "不明"}%。`;
+  else s += "天気は取得できていない。";
+  return s;
+}
+
+/* ================= seasonal scene (canvas) ================= */
+const cv=$("#scene"), cx=cv.getContext("2d"), stage=$("#stage");
+let W=0, H=0, DPR=1, bg=null, sceneDirty=true, sceneKey="", parts=[], treeTips=[];
+function rng(seed){ return ()=>{ seed|=0; seed=seed+0x6D2B79F5|0; let t=Math.imul(seed^seed>>>15,1|seed); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+function skyPhase(){
+  const n=new Date(), sr = weather?.sunrise ?? new Date(n.getFullYear(),n.getMonth(),n.getDate(),6), ss = weather?.sunset ?? new Date(n.getFullYear(),n.getMonth(),n.getDate(),18);
+  const m=40*60000;
+  if(Math.abs(n-sr)<=m) return "dawn"; if(Math.abs(n-ss)<=m) return "dusk";
+  return (n>sr && n<ss) ? "day" : "night";
+}
+const SKY = {
+  day:  {spring:["#8FC7F2","#DCEFFC"], summer:["#3C9BEA","#BFE4FF"], autumn:["#7DB4E6","#F4E3C6"], winter:["#A9BACB","#E3E8EE"]},
+  dawn: ["#2E3A7A","#E89A86"], dusk:["#3A2D6B","#F08A4B"], night:["#0B1030","#24305E"]
+};
+const GROUND = {spring:["#86B96B","#6FA157"], summer:["#4E9A4A","#3D8139"], autumn:["#B48A4E","#9A713C"], winter:["#F2F5FA","#D9E1EC"]};
+const FOLIAGE = {
+  spring:["#F7C4D7","#FAD7E3","#FFEFF5","#F2A9C4"],
+  summer:["#3E8E4A","#57A956","#76C26A","#2F7A3C"],
+  autumn:["#D9412B","#E8702A","#F2A03D","#B8322A","#E85A2E"],
+  winter:[]
+};
+function drawCloud(g,x,y,s,col){
+  g.fillStyle=col; g.beginPath();
+  [[0,0,1],[0.9,-0.35,0.85],[1.8,0,0.95],[0.45,0.2,0.8],[1.35,0.25,0.8]].forEach(([dx,dy,r])=>{ g.moveTo(x+dx*s+r*s,y+dy*s); g.arc(x+dx*s,y+dy*s,r*s,0,Math.PI*2); });
+  g.fill();
+}
+function drawTree(g, x, baseY, h, season, seed){
+  const R=rng(seed), tips=[], segs=[];
+  (function branch(x1,y1,len,ang,w,depth){
+    const x2=x1+Math.cos(ang)*len, y2=y1+Math.sin(ang)*len;
+    segs.push([x1,y1,x2,y2,w]);
+    if(depth===0||len<h*0.05){ tips.push([x2,y2]); return; }
+    const n = depth>4 ? 2 : 2+(R()<0.45?1:0);
+    for(let i=0;i<n;i++){
+      const spread = (i-(n-1)/2)*(0.5+R()*0.35) + (R()-0.5)*0.25;
+      branch(x2,y2,len*(0.68+R()*0.14),ang+spread,w*0.68,depth-1);
+    }
+    if(depth<4) tips.push([x2,y2]);
+  })(x, baseY, h*0.32, -Math.PI/2+(R()-0.5)*0.15, Math.max(5,h*0.06), 6);
+  g.lineCap="round";
+  g.strokeStyle = season==="winter" ? "#4B3B33" : "#5A4033";
+  for(const [x1,y1,x2,y2,w] of segs){ g.lineWidth=w; g.beginPath(); g.moveTo(x1,y1); g.lineTo(x2,y2); g.stroke(); }
+  if(season==="winter"){
+    g.strokeStyle="rgba(255,255,255,.95)";
+    for(const [x1,y1,x2,y2,w] of segs){ if(Math.abs(y2-y1) < Math.abs(x2-x1)*1.3){ g.lineWidth=Math.max(1.5,w*0.45); g.beginPath(); g.moveTo(x1,y1-w*0.45); g.lineTo(x2,y2-w*0.45); g.stroke(); } }
+    return tips;
+  }
+  const cols=FOLIAGE[season], blobR = season==="summer" ? h*0.07 : h*0.05;
+  for(const [tx,ty] of tips){
+    const k = season==="summer" ? 5 : 4;
+    for(let i=0;i<k;i++){
+      g.fillStyle=cols[Math.floor(R()*cols.length)];
+      g.globalAlpha = season==="spring" ? 0.85 : 0.92;
+      g.beginPath(); g.arc(tx+(R()-0.5)*blobR*1.8, ty+(R()-0.5)*blobR*1.4, blobR*(0.45+R()*0.6), 0, Math.PI*2); g.fill();
+    }
+  }
+  g.globalAlpha=1;
+  return tips;
+}
+function buildBackground(){
+  const season=currentSeason(), phase=skyPhase(), kind=wxKind(weather?.code);
+  bg = document.createElement("canvas"); bg.width=W*DPR; bg.height=H*DPR;
+  const g=bg.getContext("2d"); g.scale(DPR,DPR);
+  const sk = phase==="day" ? SKY.day[season] : SKY[phase];
+  let grd=g.createLinearGradient(0,0,0,H); grd.addColorStop(0,sk[0]); grd.addColorStop(1,sk[1]); g.fillStyle=grd; g.fillRect(0,0,W,H);
+  const R=rng(7);
+  if(phase==="night" && (kind==="clear"||kind==="cloudy")){
+    for(let i=0;i<70;i++){ g.fillStyle=`rgba(255,255,255,${0.3+R()*0.6})`; g.fillRect(R()*W, R()*H*0.55, 1.4, 1.4); }
+    g.fillStyle="#F4F1D8"; g.beginPath(); g.arc(W*0.78,H*0.22,18,0,Math.PI*2); g.fill();
+    g.fillStyle=sk[0]; g.beginPath(); g.arc(W*0.78+8,H*0.22-5,16,0,Math.PI*2); g.fill();
+  } else if(kind==="clear" && phase!=="night"){
+    const sy = phase==="day" ? H*0.2 : H*0.42;
+    const sg=g.createRadialGradient(W*0.76,sy,4,W*0.76,sy,70); sg.addColorStop(0,"rgba(255,246,214,1)"); sg.addColorStop(0.25,"rgba(255,238,190,.85)"); sg.addColorStop(1,"rgba(255,238,190,0)");
+    g.fillStyle=sg; g.fillRect(0,0,W,H);
+  }
+  if(season==="summer" && phase==="day" && kind==="clear"){
+    drawCloud(g, W*0.6, H*0.55, H*0.085, "rgba(255,255,255,.95)");
+    drawCloud(g, W*0.68, H*0.45, H*0.07, "rgba(255,255,255,.92)");
+  }
+  const grey = phase==="night" ? "rgba(70,78,108,.9)" : "rgba(196,203,216,.95)";
+  if(kind!=="clear" || season==="winter"){
+    const n = kind==="clear" ? 4 : 7;
+    for(let i=0;i<n;i++) drawCloud(g, (i/(n-1))*W*1.1 - W*0.08, H*(0.07+R()*0.08), H*(0.06+R()*0.03),
+      kind==="rain"||kind==="thunder" ? (phase==="night"?"rgba(52,58,82,.95)":"rgba(140,148,164,.96)") : grey);
+  }
+  g.fillStyle = season==="winter" ? "#C9D3E2" : season==="autumn" ? "#8E6A44" : season==="summer" ? "#3B7A45" : "#7FAE73";
+  g.globalAlpha=0.55; g.beginPath(); g.moveTo(0,H*0.78);
+  for(let x=0;x<W;x+=W/8) g.quadraticCurveTo(x+W/16, H*(0.68+R()*0.05), x+W/8, H*0.76);
+  g.lineTo(W,H); g.lineTo(0,H); g.fill(); g.globalAlpha=1;
+  const th = H*0.62;
+  treeTips = [ ...drawTree(g, W*0.1, H*0.88, th, season, 11), ...drawTree(g, W*0.93, H*0.88, th*0.86, season, 23) ];
+  if(W>520) treeTips.push(...drawTree(g, W*0.28, H*0.86, th*0.55, season, 37));
+  const gc=GROUND[season]; grd=g.createLinearGradient(0,H*0.82,0,H); grd.addColorStop(0,gc[0]); grd.addColorStop(1,gc[1]);
+  g.fillStyle=grd; g.beginPath(); g.moveTo(0,H*0.86); g.quadraticCurveTo(W*0.5,H*0.8,W,H*0.86); g.lineTo(W,H); g.lineTo(0,H); g.fill();
+  if(season==="autumn"||season==="spring"){
+    const cols=FOLIAGE[season];
+    for(let i=0;i<36;i++){ g.fillStyle=cols[i%cols.length]; g.globalAlpha=0.8; g.beginPath(); g.ellipse(R()*W, H*(0.87+R()*0.12), season==="autumn"?4:3, 2, R()*3, 0, Math.PI*2); g.fill(); }
+    g.globalAlpha=1;
+  }
+  if(phase==="night"){ g.fillStyle="rgba(8,12,40,.42)"; g.fillRect(0,0,W,H); }
+  if(kind==="rain"||kind==="thunder"||kind==="fog"){ g.fillStyle = kind==="fog" ? "rgba(220,224,232,.35)" : "rgba(40,48,70,.22)"; g.fillRect(0,0,W,H); }
+  sceneKey = season+phase+kind;
+  spawnParticles(season, phase, kind);
+}
+function spawnParticles(season, phase, kind){
+  parts=[];
+  const area = W*H/10000, k = reduce ? 0.3 : 1;
+  const add=(n,f)=>{ for(let i=0;i<Math.round(n*k);i++) parts.push(f()); };
+  const pick=a=>a[Math.floor(Math.random()*a.length)];
+  if(season==="spring") add(area*0.9, ()=>({t:"petal", x:Math.random()*W, y:Math.random()*H, s:2+Math.random()*2.5, vy:0.25+Math.random()*0.45, ph:Math.random()*6, r:Math.random()*6, c:pick(FOLIAGE.spring)}));
+  if(season==="autumn") add(area*0.45, ()=>({t:"leaf", x:Math.random()*W, y:Math.random()*H, s:5+Math.random()*4, vy:0.35+Math.random()*0.5, ph:Math.random()*6, r:Math.random()*6, c:pick(FOLIAGE.autumn)}));
+  if(season==="winter" || kind==="snow") add(area*(kind==="snow"?2.2:1.3), ()=>({t:"snow", x:Math.random()*W, y:Math.random()*H, s:1+Math.random()*2.6, vy:0.3+Math.random()*0.7, ph:Math.random()*6}));
+  if(season==="summer" && phase==="night" && kind!=="rain" && kind!=="thunder") add(area*0.35, ()=>({t:"firefly", x:Math.random()*W, y:H*(0.45+Math.random()*0.45), ph:Math.random()*6, sp:0.4+Math.random()*0.6}));
+  if(season==="summer" && phase!=="night") add(area*0.25, ()=>({t:"mote", x:Math.random()*W, y:Math.random()*H*0.8, ph:Math.random()*6, sp:0.2+Math.random()*0.4}));
+  if(kind==="rain"||kind==="thunder") add(area*2.4, ()=>({t:"rain", x:Math.random()*W, y:Math.random()*H, l:8+Math.random()*10, vy:7+Math.random()*5}));
+}
+function leafPath(g,s){
+  g.beginPath();
+  for(let i=0;i<10;i++){ const a=-Math.PI/2+i*Math.PI/5, r=i%2?s*0.42:s; g.lineTo(Math.cos(a)*r, Math.sin(a)*r); }
+  g.closePath();
+}
+let flash=0;
+function drawParticles(t){
+  const wind = Math.sin(t*0.3)*0.4;
+  for(const p of parts){
+    if(p.t==="petal"){
+      p.y+=p.vy*amp; p.x+=(Math.sin(t*1.2+p.ph)*0.6+wind+0.3)*amp; p.r+=0.02*amp;
+      if(p.y>H+8){ p.y=-8; const tp=treeTips[Math.floor(Math.random()*treeTips.length)]; p.x = tp ? tp[0] : Math.random()*W; }
+      if(p.x>W+8) p.x=-8;
+      cx.save(); cx.translate(p.x,p.y); cx.rotate(p.r); cx.scale(1,Math.abs(Math.cos(t*2+p.ph))*0.7+0.3);
+      cx.fillStyle=p.c; cx.beginPath(); cx.ellipse(0,0,p.s,p.s*0.62,0,0,Math.PI*2); cx.fill(); cx.restore();
+    } else if(p.t==="leaf"){
+      p.y+=p.vy*amp; p.x+=(Math.sin(t*0.9+p.ph)*0.9+wind)*amp; p.r+=0.025*amp;
+      if(p.y>H+10){ p.y=-10; p.x=Math.random()*W; }
+      cx.save(); cx.translate(p.x,p.y); cx.rotate(p.r); cx.scale(Math.abs(Math.cos(t*1.5+p.ph))*0.6+0.4,1);
+      cx.fillStyle=p.c; leafPath(cx,p.s); cx.fill(); cx.restore();
+    } else if(p.t==="snow"){
+      p.y+=p.vy*amp; p.x+=(Math.sin(t*0.8+p.ph)*0.35+wind*0.5)*amp;
+      if(p.y>H+4){ p.y=-4; p.x=Math.random()*W; }
+      cx.fillStyle="rgba(255,255,255,.92)"; cx.beginPath(); cx.arc(p.x,p.y,p.s,0,Math.PI*2); cx.fill();
+    } else if(p.t==="firefly"){
+      const x=p.x+Math.sin(t*p.sp+p.ph)*24, y=p.y+Math.cos(t*p.sp*1.3+p.ph)*14, a=(Math.sin(t*2*p.sp+p.ph)+1)/2;
+      const gg=cx.createRadialGradient(x,y,0,x,y,10); gg.addColorStop(0,`rgba(214,255,120,${0.9*a})`); gg.addColorStop(1,"rgba(214,255,120,0)");
+      cx.fillStyle=gg; cx.fillRect(x-10,y-10,20,20);
+    } else if(p.t==="mote"){
+      const x=p.x+Math.sin(t*p.sp+p.ph)*30, y=p.y+Math.cos(t*p.sp+p.ph)*16, a=(Math.sin(t*p.sp*2+p.ph)+1)/4;
+      cx.fillStyle=`rgba(255,250,220,${a})`; cx.beginPath(); cx.arc(x,y,2.2,0,Math.PI*2); cx.fill();
+    } else if(p.t==="rain"){
+      p.y+=p.vy*amp; p.x-=1.2*amp; if(p.y>H){ p.y=-p.l; p.x=Math.random()*W*1.1; }
+      cx.strokeStyle="rgba(210,225,245,.55)"; cx.lineWidth=1.2; cx.beginPath(); cx.moveTo(p.x,p.y); cx.lineTo(p.x-1.6,p.y+p.l); cx.stroke();
+    }
+  }
+  if(wxKind(weather?.code)==="thunder" && !reduce){
+    if(Math.random()<0.002) flash=1;
+    if(flash>0){ cx.fillStyle=`rgba(255,255,255,${flash*0.5})`; cx.fillRect(0,0,W,H); flash-=0.06; }
+  }
+}
+function resize(){
+  const r=stage.getBoundingClientRect(); DPR=Math.min(2,window.devicePixelRatio||1);
+  if(Math.round(r.width)===W && Math.round(r.height)===H) return;
+  W=Math.round(r.width); H=Math.round(r.height); cv.width=W*DPR; cv.height=H*DPR; sceneDirty=true;
+}
+new ResizeObserver(resize).observe(stage);
+function frame(now){
+  const t=now/1000;
+  if(W && H){
+    const key = currentSeason()+skyPhase()+wxKind(weather?.code);
+    if(sceneDirty || key!==sceneKey){ sceneDirty=false; buildBackground(); }
+    cx.setTransform(1,0,0,1,0,0); cx.drawImage(bg,0,0); cx.setTransform(DPR,0,0,DPR,0,0);
+    drawParticles(t);
+  }
+  animateBlob(t);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+/* ================= settings ================= */
+const dlg=$("#settings"), keyIn=$("#apiKey"), modelSel=$("#model"), voiceSel=$("#voiceSel"), sensSel=$("#sens"), placeIn=$("#place"), seasonSel=$("#seasonSel");
+let apiKey = store.get("aibou-gemini-key") || "", model = store.get("aibou-gemini-model") || "";
+let sens = store.get("aibou-sens") || "normal";
+let history = []; try{ history = JSON.parse(store.get("aibou-call-history")||"[]"); }catch{ history=[]; }
+function saveHistory(){ history = history.slice(-30); store.set("aibou-call-history", JSON.stringify(history)); }
+
+$("#openSettings").onclick = ()=>{
+  keyIn.value=apiKey; sensSel.value=sens; placeIn.value=place.name; seasonSel.value=seasonPref;
+  $("#historyInfo").textContent = `この端末に直近の会話を保存して、次の通話でも続きから話す。（今 ${history.length} 発言）`;
+  dlg.showModal(); if(apiKey) loadModels(apiKey);
+};
+$("#closeSettings").onclick = ()=>dlg.close();
+$("#clearHistory").onclick = ()=>{ history=[]; store.del("aibou-call-history"); $("#historyInfo").textContent="会話の記憶を消した。"; };
+seasonSel.onchange = ()=>{ seasonPref=seasonSel.value; store.set("aibou-season",seasonPref); sceneDirty=true; };
+$("#useGeo").onclick = ()=>{
+  const info=$("#placeInfo");
+  if(!navigator.geolocation){ info.textContent="このブラウザでは位置情報が使えない。市町村名で入れて。"; return; }
+  info.textContent="現在地を取得中…";
+  navigator.geolocation.getCurrentPosition(p=>{
+    place={name:"現在地", lat:+p.coords.latitude.toFixed(3), lon:+p.coords.longitude.toFixed(3)};
+    store.set("aibou-place",JSON.stringify(place)); placeIn.value=place.name; info.textContent="現在地で天気を取る。"; fetchWeather();
+  }, ()=>{ info.textContent="位置情報が使えなかった。市町村名で入れて。"; }, {timeout:10000});
+};
+async function geocode(q){
+  const r = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=1&language=ja&countryCode=JP`);
+  const j = await r.json(); const h=j.results?.[0];
+  return h ? {name:h.name, lat:h.latitude, lon:h.longitude} : null;
+}
+$("#saveSettings").onclick = async ()=>{
+  const k = keyIn.value.trim();
+  if(k && k!==apiKey){ apiKey=k; store.set("aibou-gemini-key",k); await loadModels(k); }
+  if(modelSel.value){ model=modelSel.value; store.set("aibou-gemini-model",model); }
+  sens=sensSel.value; store.set("aibou-sens",sens);
+  const q=placeIn.value.trim();
+  if(q && q!==place.name && q!=="現在地"){
+    try{ const p=await geocode(q); if(p){ place=p; store.set("aibou-place",JSON.stringify(p)); fetchWeather(); } else { $("#placeInfo").textContent="その地名が見つからなかった。市町村名で入れ直して。"; return; } }
+    catch{ $("#placeInfo").textContent="地名を検索できなかった。"; return; }
+  }
+  if(!apiKey){ keyIn.focus(); return; }
+  dlg.close(); updateReady();
+};
+
+const API = "https://generativelanguage.googleapis.com/v1beta";
+async function loadModels(k){
+  modelSel.innerHTML = '<option value="">取得中…</option>';
+  try{
+    const r = await fetch(`${API}/models?pageSize=200`, {headers:{"x-goog-api-key":k}});
+    if(!r.ok) throw new Error(r.status===400||r.status===403 ? "キーが無効かも。貼り直して。" : "一覧の取得に失敗（"+r.status+"）");
+    const {models=[]} = await r.json();
+    const ok = models.filter(m => (m.supportedGenerationMethods||[]).includes("generateContent") && /flash/i.test(m.name) && !/image|tts|audio|live|embedding|thinking-exp/i.test(m.name));
+    const ver = n => parseFloat((n.match(/gemini-(\d+(?:\.\d+)?)/)||[])[1]||0);
+    ok.sort((a,b)=> (/lite/.test(b.name)-/lite/.test(a.name)) || (/preview|exp/.test(a.name)-/preview|exp/.test(b.name)) || ver(b.name)-ver(a.name));
+    if(!ok.length) throw new Error("使えるFlash系モデルが見つからなかった");
+    modelSel.innerHTML="";
+    for(const m of ok){ const o=document.createElement("option"); o.value=m.name.replace(/^models\//,""); o.textContent=m.displayName||o.value; modelSel.append(o); }
+    modelSel.value = model && ok.some(m=>m.name.endsWith(model)) ? model : modelSel.options[0].value;
+    if(!model){ model=modelSel.value; store.set("aibou-gemini-model",model); }
+  }catch(e){ modelSel.innerHTML = `<option value="">${e.message}</option>`; }
+}
+
+/* ================= voice out ================= */
+const canTalk = "speechSynthesis" in window;
+let jaVoice=null;
+function pickVoice(){
+  try{
+    const vs=speechSynthesis.getVoices().filter(x=>/ja/i.test(x.lang));
+    const saved=store.get("aibou-voice-name")||"";
+    jaVoice = vs.find(x=>x.name===saved)
+           || vs.find(x=>/keita/i.test(x.name)&&/natural|online/i.test(x.name))
+           || vs.find(x=>/natural|online/i.test(x.name))
+           || vs.find(x=>/otoya|keita|ichiro|male|男/i.test(x.name)) || vs[0] || null;
+    voiceSel.innerHTML='<option value="">自動で選ぶ</option>';
+    for(const x of vs){ const o=document.createElement("option"); o.value=x.name; o.textContent=x.name; voiceSel.append(o); }
+    voiceSel.value = vs.some(x=>x.name===saved) ? saved : "";
+  }catch{}
+}
+if(canTalk){
+  pickVoice(); speechSynthesis.onvoiceschanged = pickVoice;
+  voiceSel.addEventListener("change", ()=>{
+    store.set("aibou-voice-name", voiceSel.value); pickVoice();
+    try{ speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance("おう、この声でいくか。"); u.lang="ja-JP"; if(jaVoice) u.voice=jaVoice; u.pitch=0.85; u.volume=1; speechSynthesis.speak(u); }catch{}
+  });
+}
+let queue=[], streamDone=true, inCall=false;
+function speakNext(){
+  if(speakingNow) return;
+  if(!queue.length){ if(streamDone && inCall && state!=="listening" && state!=="hearing") listen(500); return; }
+  const text = queue.shift();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang="ja-JP"; if(jaVoice) u.voice=jaVoice; u.rate=1.08; u.pitch=0.85; u.volume=1;
+  u.onstart = ()=>{ speakingNow=true; setState("speaking"); kick(0.14); };
+  u.onboundary = ()=>kick(0.04);
+  u.onend = u.onerror = ()=>{ speakingNow=false; speakNext(); };
+  speechSynthesis.speak(u);
+}
+const clean = s => s.replace(/[*#`>_~|•・\-]+/g," ").replace(/https?:\/\/\S+/g,"").trim();
+
+/* ================= ears: record your voice, detect pauses ================= */
+const SENS = { low:{mult:3.4, min:0.02}, normal:{mult:2.4, min:0.011}, high:{mult:1.7, min:0.005} };
+let micStream=null, ac=null, proc=null, srcNode=null, sink=null;
+let floor=0.01, voiced=false, loudFrames=0, silentMs=0, chunks=[], preroll=[], voicedMs=0, listenAt=0;
+async function openMic(){
+  micStream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true, noiseSuppression:true, autoGainControl:true, channelCount:1}});
+  ac = new (window.AudioContext||window.webkitAudioContext)();
+  await ac.resume();
+  srcNode = ac.createMediaStreamSource(micStream);
+  proc = ac.createScriptProcessor(2048,1,1);
+  sink = ac.createGain(); sink.gain.value=0;
+  srcNode.connect(proc); proc.connect(sink); sink.connect(ac.destination);
+  proc.onaudioprocess = e => onFrame(new Float32Array(e.inputBuffer.getChannelData(0)));
+}
+function closeMic(){
+  try{ if(proc) proc.onaudioprocess=null; srcNode?.disconnect(); proc?.disconnect(); sink?.disconnect(); }catch{}
+  try{ ac?.close(); }catch{}
+  micStream?.getTracks().forEach(t=>t.stop());
+  micStream=ac=proc=srcNode=sink=null;
+}
+function onFrame(d){
+  if(!ac) return;
+  const frameMs = d.length/ac.sampleRate*1000;
+  let sum=0; for(let i=0;i<d.length;i++) sum+=d[i]*d[i];
+  const rms=Math.sqrt(sum/d.length);
+  if(state!=="listening" && state!=="hearing") return;
+  if(performance.now() < listenAt) return;                 // the room is still ringing from 相棒's voice
+  const cfg=SENS[sens]||SENS.normal, thr=Math.max(cfg.min, floor*cfg.mult);
+  if(!voiced){
+    floor = floor*0.96 + Math.min(rms, 0.05)*0.04;          // learn the room's background noise
+    preroll.push(d); if(preroll.length>8) preroll.shift();  // keep the first syllable
+    if(rms>thr){ if(++loudFrames>=3){ voiced=true; chunks=preroll.slice(); preroll=[]; silentMs=0; voicedMs=0; setState("hearing"); } }
+    else loudFrames=0;
+    return;
+  }
+  chunks.push(d); voicedMs+=frameMs;
+  if(rms>thr*0.8){ silentMs=0; kick(Math.min(0.06, rms*0.6)); } else silentMs+=frameMs;
+  if(silentMs>=950 || voicedMs>=28000) finishTurn();
+}
+function finishTurn(){
+  if(!ac) return;
+  const c=chunks, rate=ac.sampleRate, dur=voicedMs-silentMs;
+  voiced=false; loudFrames=0; chunks=[]; preroll=[];
+  if(dur<300){ setState("listening"); return; }            // a cough or a click
+  respond(encodeWav(c, rate));
+}
+function encodeWav(cs, inRate){
+  let len=0; for(const c of cs) len+=c.length;
+  const all=new Float32Array(len); let o=0; for(const c of cs){ all.set(c,o); o+=c.length; }
+  let peak=0; for(let i=0;i<len;i++){ const a=Math.abs(all[i]); if(a>peak) peak=a; }
+  const gain = peak>0 ? Math.min(8, 0.9/peak) : 1;          // lift quiet voices
+  const ratio=inRate/16000, outLen=Math.floor(len/ratio), pcm=new Int16Array(outLen);
+  for(let i=0;i<outLen;i++){
+    const s=Math.floor(i*ratio), e=Math.min(len,Math.floor((i+1)*ratio)); let acc=0;
+    for(let j=s;j<e;j++) acc+=all[j];
+    const x=Math.max(-1,Math.min(1,acc/Math.max(1,e-s)*gain)); pcm[i]=x<0?x*0x8000:x*0x7fff;
+  }
+  const buf=new ArrayBuffer(44+pcm.length*2), dv=new DataView(buf), w=(p,s)=>{ for(let i=0;i<s.length;i++) dv.setUint8(p+i,s.charCodeAt(i)); };
+  w(0,"RIFF"); dv.setUint32(4,36+pcm.length*2,true); w(8,"WAVE"); w(12,"fmt ");
+  dv.setUint32(16,16,true); dv.setUint16(20,1,true); dv.setUint16(22,1,true); dv.setUint32(24,16000,true); dv.setUint32(28,32000,true); dv.setUint16(32,2,true); dv.setUint16(34,16,true);
+  w(36,"data"); dv.setUint32(40,pcm.length*2,true); new Int16Array(buf,44).set(pcm);
+  const bytes=new Uint8Array(buf); let bin=""; for(let i=0;i<bytes.length;i+=0x8000) bin+=String.fromCharCode.apply(null, bytes.subarray(i,i+0x8000));
+  return btoa(bin);
+}
+function listen(delay){
+  if(!inCall) return;
+  voiced=false; loudFrames=0; chunks=[]; preroll=[];
+  listenAt = performance.now() + (delay||0);
+  setState("listening");
+}
+function showYou(you, aibou){
+  caption.innerHTML="";
+  if(you){ const s=document.createElement("span"); s.className="you"; s.textContent="悠喜：「"+you+"」"; caption.append(s); }
+  if(aibou) caption.append(document.createTextNode(aibou));
+}
+
+/* ================= brain: Gemini hears the audio and answers ================= */
+let abortCtl=null;
+async function respond(wavB64){
+  setState("thinking"); showYou("…", "");
+  abortCtl = new AbortController(); queue=[]; streamDone=false;
+  const past = history.slice(-20); while(past.length && past[0].role!=="user") past.shift();
+  const contents = past.map(h=>({role: h.role==="user"?"user":"model", parts:[{text:h.text}]}));
+  if(contents.length && contents[contents.length-1].role==="user") contents.pop();
+  contents.push({role:"user", parts:[{inlineData:{mimeType:"audio/wav", data:wavB64}}, {text:"（これが悠喜の今の発話音声。形式どおりに答えろ）"}]});
+  const body = { systemInstruction:{parts:[{text: PERSONA + "\n\n" + situation()}]}, contents, generationConfig:{maxOutputTokens:400, temperature:0.85} };
+  let full="", heard=null, replyFrom=0, spokenTo=0;
+  const pushSentences = final => {
+    const reply = full.slice(replyFrom);
+    let rest = reply.slice(spokenTo), m;
+    while((m = rest.match(/^[\s\S]*?[。！？!?\n]/))){ const s=clean(m[0]); spokenTo+=m[0].length; rest=rest.slice(m[0].length); if(s){ queue.push(s); speakNext(); } }
+    if(final && clean(rest)){ queue.push(clean(rest)); spokenTo+=rest.length; }
+    showYou(heard||"", reply.trim());
+  };
+  try{
+    const r = await fetch(`${API}/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`, {
+      method:"POST", signal:abortCtl.signal, headers:{"Content-Type":"application/json","x-goog-api-key":apiKey}, body:JSON.stringify(body)
+    });
+    if(!r.ok){
+      const msg = r.status===429 ? "今日の無料枠を使い切ったみたいだ。明日（日本時間の夕方以降）また話そう。"
+               : (r.status===400||r.status===403) ? "APIキーかモデルの設定がおかしい。設定でモデルを選び直して。"
+               : r.status===404 ? "選んだモデルが見つからない。設定でモデルを選び直して。"
+               : "Googleにつながらなかった（"+r.status+"）。少し待ってかけ直して。";
+      endCall(msg); return;
+    }
+    const reader=r.body.getReader(), dec=new TextDecoder(); let sse="";
+    while(true){
+      const {value, done} = await reader.read(); if(done) break;
+      sse += dec.decode(value,{stream:true});
+      const lines = sse.split("\n"); sse = lines.pop();
+      for(const line of lines){
+        if(!line.startsWith("data:")) continue;
+        let j; try{ j=JSON.parse(line.slice(5)); }catch{ continue; }
+        const piece=(j.candidates?.[0]?.content?.parts||[]).map(p=>p.text||"").join("");
+        if(!piece) continue;
+        full += piece;
+        if(heard===null){
+          const m = full.match(/^\s*聞[:：]\s*(.*?)\n/);
+          if(m){ heard=m[1].trim(); replyFrom=m[0].length; }
+          else if(full.trim() && !/^\s*聞/.test(full)){ heard=""; replyFrom=0; }
+          else continue;
+        }
+        pushSentences(false);
+      }
+    }
+    if(heard===null){ const m=full.match(/^\s*聞[:：]\s*([\s\S]*)$/); heard = m ? m[1].trim() : ""; replyFrom = full.length; }
+    streamDone=true; pushSentences(true);
+    const reply = full.slice(replyFrom).trim();
+    if(!reply){ queue.push("…悪い、うまく聞き取れなかった。もう一回言ってくれ。"); }
+    else if(heard && !/不明/.test(heard)){ history.push({role:"user",text:heard},{role:"model",text:reply}); saveHistory(); }
+    speakNext();
+  }catch(e){
+    streamDone=true;
+    if(e.name==="AbortError") return;
+    endCall("通信が切れた。ネットを確認してかけ直して。");
+  }
+}
+
+/* ================= call control ================= */
+function updateReady(){
+  const ok = !!(navigator.mediaDevices?.getUserMedia && (window.AudioContext||window.webkitAudioContext) && canTalk);
+  if(!ok){ callBtn.disabled=true; hint.className="hint warn"; hint.textContent="このブラウザは音声会話に対応してない。ChromeかEdgeで開いて。"; return false; }
+  if(!apiKey){ hint.className="hint warn"; hint.textContent="最初に右上の「設定」からGeminiのAPIキーを入れて。"; return false; }
+  hint.className="hint"; hint.textContent="話し終わって少し黙ると相棒が答える。割り込みたいときは相棒をタップ。"; return true;
+}
+blob.addEventListener("click", ()=>{
+  if(!inCall){ kick(0.28); return; }
+  if(state==="speaking"||state==="thinking"){
+    abortCtl?.abort(); queue=[]; streamDone=true;
+    try{ speechSynthesis.cancel(); }catch{} speakingNow=false; kick(0.3); listen(150);
+  } else if(state==="hearing"){ finishTurn(); }
+  else kick(0.2);
+});
+async function startCall(){
+  if(!updateReady()){ if(!apiKey) $("#openSettings").click(); return; }
+  if(!model){ $("#openSettings").click(); return; }
+  try{ await openMic(); }catch{ caption.textContent="マイクが使えなかった。アドレスバー左のアイコンからマイクを「許可」にして。"; closeMic(); return; }
+  inCall=true; callBtn.textContent="通話を切る"; callBtn.classList.add("on");
+  try{ speechSynthesis.cancel(); }catch{}
+  const h=new Date().getHours();
+  const greet = history.length ? "おう、さっきの続きか。話せ。" : (h<5||h>=22 ? "こんな時間にどうした、悠喜。" : "おう、悠喜。何の用だ。");
+  showYou("", greet); queue=[greet]; streamDone=true; setState("speaking"); speakNext();
+}
+function endCall(msg){
+  inCall=false; abortCtl?.abort(); queue=[];
+  try{ speechSynthesis.cancel(); }catch{} speakingNow=false;
+  closeMic(); setState("idle"); callBtn.textContent="通話を始める"; callBtn.classList.remove("on");
+  if(msg) caption.textContent=msg;
+}
+callBtn.addEventListener("click", ()=> inCall ? endCall("通話を切った。") : startCall());
+
+/* ================= boot ================= */
+updateClock(); setInterval(updateClock, 10000);
+fetchWeather(); setInterval(fetchWeather, 15*60000);
+updateReady();
+if(!apiKey) setTimeout(()=>$("#openSettings").click(), 500);
+</script>
+</body>
+</html>
