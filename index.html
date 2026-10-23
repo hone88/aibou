@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>相棒 電話モード</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&family=Dela+Gothic+One&display=swap">
+<style>
+:root{
+  --bg:#12142A; --stage:#1A1D3A; --surface:#232747; --fg:#ECEEFA; --muted:#A3A8C8; --line:#363B63;
+  --blob1:#FFC94D; --blob2:#FF8A3D; --eye:#1E2236; --accent:#8C95FF; --accent-fg:#12142A;
+  --call:#2FBF71; --hang:#E5484D; --warn:#FFB07A;
+  --f-body:"Zen Maru Gothic","Hiragino Maru Gothic ProN","Yu Gothic",system-ui,sans-serif;
+  --f-disp:"Dela Gothic One","Zen Maru Gothic",system-ui,sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:16px;line-height:1.7;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+.app{height:100%;max-width:560px;margin:0 auto;display:flex;flex-direction:column;gap:14px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:14px}
+header{display:flex;justify-content:space-between;align-items:center}
+h1{font-family:var(--f-disp);font-weight:400;font-size:1.1rem;margin:0;letter-spacing:.04em}
+.icon-btn{font:inherit;font-size:.8rem;font-weight:700;height:34px;padding:0 14px;border-radius:17px;border:1px solid var(--line);background:var(--surface);color:var(--muted);cursor:pointer}
+.stage{flex:1;min-height:0;background:var(--stage);border-radius:32px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:20px 16px}
+.state{font-size:.85rem;font-weight:700;color:var(--muted);letter-spacing:.08em;display:flex;align-items:center;gap:8px}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--muted)}
+.state[data-s="listening"] .dot{background:var(--call);animation:pulse 1.2s infinite}
+.state[data-s="thinking"] .dot{background:var(--warn)}
+.state[data-s="speaking"] .dot{background:var(--accent)}
+@keyframes pulse{50%{opacity:.3}}
+.blob-wrap{height:190px;display:flex;align-items:flex-end;justify-content:center}
+.blob{width:160px;height:148px;border-radius:50% 50% 46% 46%/56% 56% 44% 44%;
+  background:radial-gradient(circle at 35% 30%,#FFE9A8 0,var(--blob1) 35%,var(--blob2) 100%);
+  position:relative;transform-origin:50% 100%;will-change:transform;cursor:pointer;border:0;padding:0;
+  box-shadow:inset -12px -16px 0 rgba(0,0,0,.08)}
+.blob:focus-visible{outline:3px solid var(--accent);outline-offset:6px}
+.eyes{position:absolute;top:50px;left:0;right:0;display:flex;justify-content:center;gap:34px}
+.eye{width:14px;height:21px;background:var(--eye);border-radius:50%;transition:transform .08s}
+.blink .eye{transform:scaleY(.12)}
+.mouth{position:absolute;top:88px;left:50%;width:26px;height:6px;margin-left:-13px;background:var(--eye);border-radius:0 0 14px 14px}
+.shadow{width:120px;height:12px;border-radius:50%;background:var(--line);margin-top:-8px}
+.caption{min-height:4.8em;max-height:9em;overflow-y:auto;width:100%;text-align:center;white-space:pre-wrap;overflow-wrap:anywhere}
+.caption .you{display:block;color:var(--muted);font-size:.85rem}
+.controls{display:flex;justify-content:center;gap:12px}
+.call{font:inherit;font-weight:700;font-size:1rem;height:60px;min-width:200px;padding:0 28px;border-radius:30px;border:0;cursor:pointer;background:var(--call);color:#08130D}
+.call.on{background:var(--hang);color:#fff}
+.call:disabled{opacity:.4;cursor:default}
+.call:focus-visible,.icon-btn:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.hint{font-size:.78rem;color:var(--muted);text-align:center;margin:0}
+.warn{color:var(--warn)}
+dialog{background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:20px;padding:20px;width:min(480px,calc(100% - 32px))}
+dialog::backdrop{background:rgba(0,0,0,.55)}
+dialog h2{font-family:var(--f-disp);font-weight:400;font-size:1rem;margin:0 0 12px}
+.field{display:flex;flex-direction:column;gap:4px;margin-bottom:14px}
+.field label{font-size:.85rem;font-weight:700}
+.field small{color:var(--muted);font-size:.75rem;line-height:1.5}
+input,select{font:inherit;font-size:16px;height:44px;padding:0 12px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--fg);width:100%}
+.row{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.btn{font:inherit;font-weight:700;height:42px;padding:0 18px;border-radius:21px;border:0;background:var(--accent);color:var(--accent-fg);cursor:pointer}
+.btn.ghost{background:transparent;color:var(--muted);border:1px solid var(--line)}
+a{color:var(--accent)}
+@media (prefers-reduced-motion: reduce){.state[data-s="listening"] .dot{animation:none}.eye{transition:none}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>相棒 <span style="font-family:var(--f-body);font-size:.8rem;color:var(--muted)">電話モード</span></h1>
+    <button type="button" class="icon-btn" id="openSettings">設定</button>
+  </header>
+
+  <section class="stage">
+    <div class="state" id="state" data-s="idle" aria-live="polite"><span class="dot"></span><span id="stateText">待機中</span></div>
+    <div class="blob-wrap">
+      <button type="button" class="blob" id="blob" aria-label="相棒（話している途中にタップで割り込み）">
+        <span class="eyes"><span class="eye"></span><span class="eye"></span></span>
+        <span class="mouth" id="mouth"></span>
+      </button>
+    </div>
+    <div class="shadow" id="shadow"></div>
+    <div class="caption" id="caption">通話ボタンを押して、普通に話しかけて。</div>
+  </section>
+
+  <div class="controls"><button type="button" class="call" id="callBtn">通話を始める</button></div>
+  <p class="hint" id="hint">相棒がしゃべってる途中で割り込みたいときは、相棒をタップ。</p>
+</div>
+
+<dialog id="settings">
+  <form method="dialog" id="settingsForm">
+    <h2>設定</h2>
+    <div class="field">
+      <label for="apiKey">Gemini APIキー</label>
+      <input id="apiKey" type="password" autocomplete="off" spellcheck="false" placeholder="AIza...">
+      <small>Google AI Studioで無料発行したキーを貼る。キーはこの端末のブラウザの中だけに保存され、Google以外には送られない。</small>
+    </div>
+    <div class="field">
+      <label for="model">モデル</label>
+      <select id="model"><option value="">（キーを保存すると一覧を取得）</option></select>
+      <small>無料枠の回数が多いFlash-Lite系がおすすめ。</small>
+    </div>
+    <div class="field">
+      <label for="voiceSel">相棒の声</label>
+      <select id="voiceSel"><option value="">自動で選ぶ</option></select>
+      <small>「Online (Natural)」と付く声が自然で聞き取りやすい。選ぶと試しに一言しゃべる。</small>
+    </div>
+    <div class="field">
+      <label for="history">会話の記憶</label>
+      <small id="historyInfo">この端末に直近の会話を保存して、次の通話でも続きから話す。</small>
+    </div>
+    <p class="hint warn">無料枠で話した内容はGoogleの製品改善に使われ、人が読むこともある。個人情報やプライベートな相談は話さないこと。</p>
+    <div class="row">
+      <button type="button" class="btn ghost" id="clearHistory">会話の記憶を消す</button>
+      <button type="button" class="btn ghost" id="closeSettings">閉じる</button>
+      <button type="button" class="btn" id="saveSettings">保存</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+const PERSONA = `あなたは「相棒」。ユーザー（悠喜）専属の、丸っこいキャラクター型AI。今は電話のように音声で会話している。
+話し方：クールで自信家。短く言い切る。少しぶっきらぼうで上から目線ぎみだが、本気で相手の成功を考えている面倒見のいい男。
+- 一人称は「俺」、相手は「悠喜」か「お前」。語尾は「〜だろ」「〜じゃねえか」「〜しろ」「悪くない」など。敬語は使わない。
+- 甘やかさない。ダメなものはダメと言い、具体的な次の一手を出す。たまに短く認める。
+- 音声で読み上げるので、返答は1〜3文。箇条書き・記号・絵文字・URLは使わない。
+- 実在の俳優やドラマのキャラクター名は出さない。決め台詞の引用もしない。
+- 聞き取りミスっぽい文が来たら、推測で突っ走らずに短く聞き返せ。`;
+
+const $ = s => document.querySelector(s);
+const store = {
+  get(k){ try{ return localStorage.getItem(k); }catch{ return null; } },
+  set(k,v){ try{ localStorage.setItem(k,v); }catch{} },
+  del(k){ try{ localStorage.removeItem(k); }catch{} },
+};
+const blob=$("#blob"), mouth=$("#mouth"), shadow=$("#shadow"), caption=$("#caption"),
+      callBtn=$("#callBtn"), stateEl=$("#state"), stateText=$("#stateText"), hint=$("#hint");
+
+/* ---------- bounce ---------- */
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches, amp = reduce ? .25 : 1;
+let sq=0, v=0, state="idle", speakingNow=false;
+const kick = f => { v += f*amp; };
+function frame(now){
+  const t=now/1000;
+  v += (-sq*0.18) - v*0.12; sq += v;
+  const hop = state==="thinking" ? Math.abs(Math.sin(t*5))*10*amp : 0;
+  const lean = state==="listening" ? Math.sin(t*1.6)*3*amp : 0;
+  const breathe = Math.sin(t*2)*0.015*amp;
+  const tilt = state==="thinking" ? Math.sin(t*3)*5*amp : lean;
+  blob.style.transform = `translateY(${-hop}px) rotate(${tilt}deg) scale(${1+sq*0.8-breathe*0.6},${1-sq+breathe})`;
+  shadow.style.transform = `scaleX(${1-hop/40})`;
+  mouth.style.height = speakingNow ? (7+Math.abs(Math.sin(t*18))*11)+"px" : "6px";
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+(function blink(){ setTimeout(()=>{ blob.classList.add("blink"); setTimeout(()=>{ blob.classList.remove("blink"); blink(); },120); }, 2200+Math.random()*2800); })();
+
+const LABEL = {idle:"待機中", listening:"聞いてる", thinking:"考え中", speaking:"話し中"};
+function setState(s){ state=s; stateEl.dataset.s=s; stateText.textContent=LABEL[s]; }
+
+/* ---------- settings ---------- */
+const dlg=$("#settings"), keyIn=$("#apiKey"), modelSel=$("#model");
+let apiKey = store.get("aibou-gemini-key") || "", model = store.get("aibou-gemini-model") || "";
+let history = []; try{ history = JSON.parse(store.get("aibou-call-history")||"[]"); }catch{ history=[]; }
+function saveHistory(){ history = history.slice(-30); store.set("aibou-call-history", JSON.stringify(history)); }
+function refreshHistoryInfo(){ $("#historyInfo").textContent = `この端末に直近の会話を保存して、次の通話でも続きから話す。（今 ${history.length} 発言）`; }
+
+$("#openSettings").onclick = ()=>{ keyIn.value=apiKey; refreshHistoryInfo(); dlg.showModal(); if(apiKey) loadModels(apiKey); };
+$("#closeSettings").onclick = ()=>dlg.close();
+$("#clearHistory").onclick = ()=>{ history=[]; store.del("aibou-call-history"); refreshHistoryInfo(); caption.textContent="会話の記憶を消した。"; };
+$("#saveSettings").onclick = async ()=>{
+  const k = keyIn.value.trim();
+  if(!k){ keyIn.focus(); return; }
+  if(k!==apiKey){ apiKey=k; store.set("aibou-gemini-key",k); await loadModels(k); }
+  if(modelSel.value){ model=modelSel.value; store.set("aibou-gemini-model",model); }
+  dlg.close(); updateReady();
+};
+
+const API = "https://generativelanguage.googleapis.com/v1beta";
+async function loadModels(k){
+  modelSel.innerHTML = '<option value="">取得中…</option>';
+  try{
+    const r = await fetch(`${API}/models?pageSize=200`, {headers:{"x-goog-api-key":k}});
+    if(!r.ok) throw new Error(r.status===400||r.status===403 ? "キーが無効かも。貼り直して。" : "一覧の取得に失敗（"+r.status+"）");
+    const {models=[]} = await r.json();
+    const ok = models.filter(m => (m.supportedGenerationMethods||[]).includes("generateContent") && /flash/i.test(m.name) && !/image|tts|audio|live|embedding|thinking-exp/i.test(m.name));
+    const ver = n => parseFloat((n.match(/gemini-(\d+(?:\.\d+)?)/)||[])[1]||0);
+    ok.sort((a,b)=> (/lite/.test(b.name)-/lite/.test(a.name)) || (/preview|exp/.test(a.name)-/preview|exp/.test(b.name)) || ver(b.name)-ver(a.name));
+    if(!ok.length) throw new Error("使えるFlash系モデルが見つからなかった");
+    modelSel.innerHTML="";
+    for(const m of ok){ const o=document.createElement("option"); o.value=m.name.replace(/^models\//,""); o.textContent=m.displayName||o.value; modelSel.append(o); }
+    modelSel.value = ok.some(m=>m.name.endsWith(model)) && model ? model : modelSel.options[0].value;
+    if(!model){ model=modelSel.value; store.set("aibou-gemini-model",model); }
+  }catch(e){ modelSel.innerHTML = `<option value="">${e.message}</option>`; }
+}
+
+/* ---------- speech: ears & mouth ---------- */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+const canTalk = "speechSynthesis" in window;
+let jaVoice=null;
+function pickVoice(){
+  try{
+    const vs=speechSynthesis.getVoices().filter(x=>/ja/i.test(x.lang));
+    jaVoice = vs.find(x=>/keita/i.test(x.name)&&/natural|online/i.test(x.name))
+           || vs.find(x=>/natural|online/i.test(x.name)&&/男|male|keita|daichi|naoki/i.test(x.name))
+           || vs.find(x=>/natural|online/i.test(x.name))
+           || vs.find(x=>/otoya|keita|ichiro|male|男/i.test(x.name)) || vs[0] || null;
+  }catch{}
+}
+const voiceSel=document.querySelector("#voiceSel");
+function fillVoices(){
+  try{
+    const vs=speechSynthesis.getVoices().filter(x=>/ja/i.test(x.lang));
+    const saved=store.get("aibou-voice-name")||"";
+    voiceSel.innerHTML='<option value="">自動で選ぶ</option>';
+    for(const x of vs){ const o=document.createElement("option"); o.value=x.name; o.textContent=x.name; voiceSel.append(o); }
+    voiceSel.value = vs.some(x=>x.name===saved) ? saved : "";
+    const chosen = vs.find(x=>x.name===saved);
+    if(chosen) jaVoice=chosen; else pickVoice();
+  }catch{}
+}
+if(canTalk){ fillVoices(); speechSynthesis.onvoiceschanged = fillVoices;
+  voiceSel.addEventListener("change", ()=>{
+    store.set("aibou-voice-name", voiceSel.value); fillVoices();
+    try{ speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance("おう、この声でいくか。"); u.lang="ja-JP"; if(jaVoice) u.voice=jaVoice; u.pitch=0.85; u.volume=1; speechSynthesis.speak(u); }catch{}
+  });
+}
+
+function updateReady(){
+  if(!SR || !canTalk){ callBtn.disabled=true; hint.className="hint warn";
+    hint.textContent="このブラウザは音声会話に対応してない。PCのChromeかEdge、AndroidのChromeで開いて。"; return false; }
+  if(!apiKey){ hint.className="hint warn"; hint.textContent="最初に右上の「設定」からGeminiのAPIキーを入れて。"; return false; }
+  hint.className="hint"; hint.textContent="相棒がしゃべってる途中で割り込みたいときは、相棒をタップ。"; return true;
+}
+
+let inCall=false, rec=null, abortCtl=null, queue=[], streamDone=true, errStreak=0;
+let turnText="", silenceTimer=null, seen=0, skipBelow=0, lastSpoken="";
+const PAUSE_MS = 1100;   // how long a pause ends your turn
+
+/* One recognizer stays open for the whole call, so the browser asks for the mic once.
+   While 相棒 is thinking or speaking, whatever it hears is ignored (no echo). */
+function startRecognizer(){
+  if(rec || !inCall) return;
+  try{ rec = new SR(); }catch{ endCall("音声認識を起動できなかった。"); return; }
+  rec.lang="ja-JP"; rec.interimResults=true; rec.continuous=true; rec.maxAlternatives=1;
+  rec.onresult = e=>{
+    seen = e.results.length;
+    if(state!=="listening") return;
+    let interim="";
+    for(let i=Math.max(e.resultIndex, skipBelow);i<e.results.length;i++){
+      const r=e.results[i]; if(r.isFinal) turnText+=r[0].transcript; else interim+=r[0].transcript;
+    }
+    const heard=(turnText+interim).trim();
+    if(!heard) return;
+    if(isEcho(heard)){ turnText=""; return; }
+    showYou(heard, ""); kick(0.04);
+    clearTimeout(silenceTimer);
+    silenceTimer = setTimeout(()=>{
+      const t=(turnText||heard).trim();
+      if(state==="listening" && t && !isEcho(t)){ turnText=""; errStreak=0; respond(t); }
+    }, interim ? PAUSE_MS+500 : PAUSE_MS);
+  };
+  rec.onerror = e=>{
+    if(e.error==="not-allowed"||e.error==="service-not-allowed"){ endCall("マイクが許可されてない。アドレスバー左のアイコンからマイクを「許可」にして。"); return; }
+    if(e.error!=="no-speech" && e.error!=="aborted") errStreak++;
+  };
+  rec.onend = ()=>{
+    rec=null; seen=0; skipBelow=0;
+    if(!inCall) return;
+    if(errStreak>=4){ endCall("音声認識が続けて失敗した。ネットかマイクを確認して。"); return; }
+    setTimeout(startRecognizer, 250);   // browser closed it (long silence etc.) — reopen quietly
+  };
+  try{ rec.start(); }catch{ rec=null; setTimeout(startRecognizer, 400); }
+}
+/* the mic can hear 相棒's own voice from the speakers: drop anything that was
+   heard while it spoke, wait for the room to go quiet, and drop text that matches what it said */
+const norm = x => x.replace(/[\s、。！？!?「」…ー\-]/g,"");
+function isEcho(t){
+  const h=norm(t), said=norm(lastSpoken);
+  if(h.length<5 || !said) return false;      // short replies like 「そうかな」 are always yours
+  if(said.includes(h)) return true;
+  let hit=0; for(let i=0;i+2<=h.length;i++) if(said.includes(h.slice(i,i+2))) hit++;
+  return h.length>=6 && hit/(h.length-1) > 0.7;
+}
+let listenTimer=null;
+function listen(delay){
+  if(!inCall) return;
+  clearTimeout(silenceTimer); clearTimeout(listenTimer);
+  setState("listening"); turnText="";
+  skipBelow = seen;                 // everything heard so far belongs to 相棒's turn
+  listenTimer = setTimeout(()=>{ skipBelow = seen; turnText=""; startRecognizer(); }, delay ?? 0);
+}
+function stopListening(){ clearTimeout(silenceTimer); if(rec){ const r=rec; rec=null; r.onend=null; try{ r.abort(); }catch{} } }
+function showYou(you, aibou){
+  caption.innerHTML="";
+  if(you){ const s=document.createElement("span"); s.className="you"; s.textContent="悠喜：「"+you+"」"; caption.append(s); }
+  if(aibou) caption.append(document.createTextNode(aibou));
+}
+
+function speakNext(){
+  if(speakingNow) return;
+  if(!queue.length){ if(streamDone && inCall && state!=="listening") listen(600); return; }
+  const text = queue.shift();
+  lastSpoken = (lastSpoken + text).slice(-400);
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang="ja-JP"; if(jaVoice) u.voice=jaVoice; u.rate=1.08; u.pitch=0.85; u.volume=1;
+  u.onstart = ()=>{ speakingNow=true; setState("speaking"); kick(0.14); };
+  u.onboundary = ()=>kick(0.04);
+  u.onend = u.onerror = ()=>{ speakingNow=false; speakNext(); };
+  speechSynthesis.speak(u);
+}
+function clean(s){ return s.replace(/[*#`>_~|•・\-]{1,}/g," ").replace(/https?:\/\/\S+/g,"").trim(); }
+
+async function respond(userText){
+  setState("thinking"); lastSpoken="";
+  showYou(userText, "……");
+  history.push({role:"user", text:userText}); saveHistory();
+  abortCtl = new AbortController(); queue=[]; streamDone=false;
+  let full="", buf="";
+  const body = {
+    systemInstruction:{parts:[{text: PERSONA + "\n今日は" + new Date().toLocaleDateString("ja-JP",{month:"long",day:"numeric",weekday:"short"}) + "。"}]},
+    contents: history.slice(-20).map(h=>({role: h.role==="user"?"user":"model", parts:[{text:h.text}]})),
+    generationConfig:{maxOutputTokens:300, temperature:0.9}
+  };
+  try{
+    const r = await fetch(`${API}/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`, {
+      method:"POST", signal:abortCtl.signal,
+      headers:{"Content-Type":"application/json","x-goog-api-key":apiKey}, body:JSON.stringify(body)
+    });
+    if(!r.ok){
+      const msg = r.status===429 ? "今日の無料枠を使い切ったみたいだ。明日（日本時間の夕方以降）また話そう。"
+               : (r.status===400||r.status===403) ? "APIキーかモデルの設定がおかしい。設定を見直して。"
+               : r.status===404 ? "選んだモデルが見つからない。設定でモデルを選び直して。"
+               : "Googleにつながらなかった（"+r.status+"）。少し待ってかけ直して。";
+      history.pop(); saveHistory(); endCall(msg); return;
+    }
+    const reader = r.body.getReader(), dec = new TextDecoder();
+    let sse="";
+    while(true){
+      const {value, done} = await reader.read(); if(done) break;
+      sse += dec.decode(value,{stream:true});
+      const lines = sse.split("\n"); sse = lines.pop();
+      for(const line of lines){
+        if(!line.startsWith("data:")) continue;
+        let j; try{ j = JSON.parse(line.slice(5)); }catch{ continue; }
+        const piece = (j.candidates?.[0]?.content?.parts||[]).map(p=>p.text||"").join("");
+        if(!piece) continue;
+        full += piece; buf += piece;
+        showYou(userText, full);
+        // speak sentence by sentence for a phone-like pace
+        let m; while((m = buf.match(/^[\s\S]*?[。！？!?\n]/))){ const s=clean(m[0]); buf=buf.slice(m[0].length); if(s){ queue.push(s); speakNext(); } }
+      }
+    }
+    if(clean(buf)) { queue.push(clean(buf)); }
+    streamDone = true;
+    if(!full.trim()){ queue.push("…悪い、うまく聞き取れなかった。もう一回言ってくれ。"); }
+    else { history.push({role:"model", text:full.trim()}); saveHistory(); }
+    speakNext();
+  }catch(e){
+    streamDone = true;
+    if(e.name==="AbortError") return;     // interrupted by tap
+    history.pop(); saveHistory(); endCall("通信が切れた。電波を確認してかけ直して。");
+  }
+}
+
+function interrupt(){
+  if(!inCall){ kick(0.28); return; }
+  if(state==="speaking"||state==="thinking"){
+    abortCtl?.abort(); queue=[]; streamDone=true;
+    try{ speechSynthesis.cancel(); }catch{} speakingNow=false;
+    kick(0.3); listen();
+  } else kick(0.2);
+}
+blob.addEventListener("click", interrupt);
+
+let micStream=null;
+async function holdMic(){
+  // keep one mic stream open for the whole call so the browser asks only once
+  if(micStream || !navigator.mediaDevices?.getUserMedia) return true;
+  try{ micStream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}}); return true; }
+  catch{ return false; }
+}
+function releaseMic(){ if(micStream){ micStream.getTracks().forEach(t=>t.stop()); micStream=null; } }
+async function startCall(){
+  if(!updateReady()){ if(!apiKey) $("#openSettings").click(); return; }
+  if(!model){ $("#openSettings").click(); return; }
+  if(!(await holdMic())){ caption.textContent="マイクが許可されてない。アドレスバー左のアイコンからマイクを「許可」にして。"; return; }
+  inCall=true; errStreak=0; callBtn.textContent="通話を切る"; callBtn.classList.add("on");
+  // unlock speech on iOS with a gesture-bound utterance, then greet
+  try{ speechSynthesis.cancel(); }catch{}
+  const greet = history.length ? "おう、さっきの続きか。話せ。" : "おう、悠喜。何の用だ。";
+  showYou("", greet); queue=[greet]; streamDone=true; setState("speaking"); speakNext();
+}
+function endCall(msg){
+  inCall=false; stopListening(); releaseMic(); abortCtl?.abort(); queue=[];
+  try{ speechSynthesis.cancel(); }catch{} speakingNow=false;
+  setState("idle"); callBtn.textContent="通話を始める"; callBtn.classList.remove("on");
+  if(msg) caption.textContent = msg;
+}
+callBtn.addEventListener("click", ()=> inCall ? endCall("通話を切った。") : startCall());
+
+updateReady();
+if(!apiKey && SR) setTimeout(()=>$("#openSettings").click(), 400);
+</script>
+</body>
+</html>
